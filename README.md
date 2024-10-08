@@ -5,6 +5,14 @@ Cognito にトークン生成前 Lambda トリガーを設定し、JWT にカス
 ## deploy
 
 ```bash
+mkdir -p layer/aws-sdk-layer/nodejs
+cd layer/aws-sdk-layer/nodejs
+npm init -y
+npm install aws-sdk
+cd ../../..
+```
+
+```bash
 npx cdk deploy
 ```
 
@@ -74,5 +82,39 @@ aws cognito-idp initiate-auth \
   #   "iat": 1728369461,
   #   "jti": "342b5396-4609-408f-be78-24b4ae5b3342",
   #   "email": "nemoto@opentone.co.jp"
+  # }
+```
+
+### DynamoDB に属性情報を登録
+
+```bash
+SUB=$(aws cognito-idp initiate-auth \
+    --client-id ${USER_POOL_CLIENT_ID} \
+    --auth-flow USER_PASSWORD_AUTH \
+    --auth-parameters USERNAME=nemoto@opentone.co.jp,PASSWORD='Passw0rd!!!' | jq -r '.AuthenticationResult.IdToken' | sed "s/\./\n/g" | sed -n 2p | base64 -d 2>/dev/null | jq -r .sub | tee /dev/tty)
+
+aws dynamodb put-item \
+    --table-name AuthorizationTable \
+    --item "{
+        \"id\": {\"S\": \"${SUB}\"},
+        \"economic_ripple_effect\": {\"BOOL\": true},
+        \"demand_forecasting\": {\"BOOL\": true}
+    }"
+```
+
+```bash
+aws dynamodb get-item --table-name AuthorizationTable --key "{\"id\":{\"S\":\"${SUB}\"}}"
+  # {
+  #     "Item": {
+  #         "id": {
+  #             "S": "c7a44ab8-b011-7062-23ec-e6d30893c22a"
+  #         },
+  #         "economic_ripple_effect": {
+  #             "BOOL": true
+  #         },
+  #         "demand_forecasting": {
+  #             "BOOL": true
+  #         }
+  #     }
   # }
 ```
